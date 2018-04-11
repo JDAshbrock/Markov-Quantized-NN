@@ -154,7 +154,7 @@ end %End train loop
 %The following code smooths the "parameters updated" by taking a running
 %average of the previous "smoothfactor" parameter updates
 smoothfactor=100;
-smoothedchanged =zeros(1,length(numchanged)-smoothfactor);
+smoothedchanged =zeros(1,l-smoothfactor);
 for i=smoothfactor:length(numchanged)
     temp=0;
     for j=1:smoothfactor-1
@@ -167,7 +167,7 @@ len=length(smoothedchanged);
 %Final diagnostic plots
 Accuracy = counter/TestSize; %Final Accuracy
 plot(1:len, smoothedchanged);
-plot(1:looplength,numchanged);
+plot(1:l,numchanged(1:l));
 DisplayImage(Layer1Weights(1,:)); 
 DisplayImage(Layer1Weights(2,:)); 
 DisplayImage(Layer1Weights(3,:)); 
