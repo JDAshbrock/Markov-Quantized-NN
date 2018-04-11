@@ -10,13 +10,13 @@ InputSize = PictureHeight*PictureWidth+1; % +1 for the bias
 Layer1Size = 20;
 NumberOfCategories = 10; % 1 per digit from 0-9
 alpha = 1; %Scaling parameter so as to interpret gradients as probabilities
-BaseRate=30;
+BaseRate=10;
 ImageSet = LoadMNISTImages('train-images.idx3-ubyte');
 Labels = LoadMNISTLabels('train-labels.idx1-ubyte');
 TestImages = LoadMNISTImages('t10k-images.idx3-ubyte');
 TestLabels = LoadMNISTLabels('t10k-labels.idx1-ubyte');
 TestSize = 5000;
-looplength=1000; %Control the length of the training loop - 60000 max.
+looplength=60000; %Control the length of the training loop - 60000 max.
 TotalWeights=InputSize*Layer1Size + (Layer1Size+1)*NumberOfCategories;
 
 Layer1Weights = zeros(Layer1Size,InputSize); %Layer1(i,j) contains the weight from input j into neuron input
@@ -44,13 +44,15 @@ end
 Layer1Outputs = zeros(1,Layer1Size); %Layer1Outputs(i) contains the output form neuron i, layer 1
 FinalOutputs = zeros(1,NumberOfCategories); %FinalOutputs(i) contains the output corresponding to category i
 
-tic
+
 % countoff=zeros(1,looplength);
 % counton = zeros(1,looplength);
 % oversat=zeros(1,looplength);
 % undersat=zeros(1,looplength);
 sup=0;
+decay=1;
 numchanged=zeros(1,looplength);
+PartialAcc = zeros(1,floor(looplength/5000)); testnum=0; %These variables are used for intermittent accuracy test
 for l=1:looplength%Training Loop
     decay=floor(l/10000)+1;
     LearningRate=BaseRate/decay;
@@ -123,25 +125,48 @@ for l=1:looplength%Training Loop
     sup1 = max(max(Layer1Gradient));
     sup2 =max(max(FinalGradient));
     sup=max([sup1,sup2,sup]); % This code tracks the size of the largest gradient value
-    if(rem(l,100)==1)
+    if(rem(l,1000)==1)
         l
     end
-end
-toc
-%Now we test the accuracy of the trained network
-counter =0;
-for i=1:TestSize
-	Im = horzcat(TestImages(:,i)',1)';
-	TrainingLabel = TestLabels(i);
-	Layer1Outputs = horzcat(pt_atan(Layer1Weights*Im),1)';
-	FinalOutputs = FinalWeights*Layer1Outputs;
-	Class = find(FinalOutputs == max(FinalOutputs))-1;% the -1 because index 1 corresponds to 
-	% classification as a 0
-	if(Class==TrainingLabel)
-		counter = counter+1;
+    % Test intermittently throughout training
+    if(rem(l,5000)==0)
+        counter=0;
+        testnum = testnum+1;
+        for i=1:TestSize
+        Im = horzcat(TestImages(:,i)',1)';
+        TrainingLabel = TestLabels(i);
+        Layer1Outputs = horzcat(pt_atan(Layer1Weights*Im),1)';
+        FinalOutputs = FinalWeights*Layer1Outputs;
+    	Class = find(FinalOutputs == max(FinalOutputs))-1;% the -1 because index 1 corresponds to 
+    	% classification as a 0
+    	if(Class==TrainingLabel) %#ok<ALIGN>
+        	counter = counter+1;
+        end
+        end
+        acc=counter/TestSize
+        PartialAcc(testnum)=acc;
+    end %End test
+end %End train loop
+    
+    
+
+
+%The following code smooths the "parameters updated" by taking a running
+%average of the previous "smoothfactor" parameter updates
+smoothfactor=100;
+smoothedchanged =zeros(1,length(numchanged)-smoothfactor);
+for i=smoothfactor:length(numchanged)
+    temp=0;
+    for j=1:smoothfactor-1
+        temp=temp+numchanged(i-j+1);
     end
+    smoothedchanged(i)=temp;
 end
-Accuracy = counter/TestSize;
+len=length(smoothedchanged);
+
+%Final diagnostic plots
+Accuracy = counter/TestSize; %Final Accuracy
+plot(1:len, smoothedchanged);
 plot(1:looplength,numchanged);
 DisplayImage(Layer1Weights(1,:)); 
 DisplayImage(Layer1Weights(2,:)); 
