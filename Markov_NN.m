@@ -163,6 +163,8 @@ for i=smoothfactor:length(numchanged)
     smoothedchanged(i)=temp;
 end
 len=length(smoothedchanged);
+smoothedchanged=smoothedchanged/TotalWeights;
+numchanged=numchanged/TotalWeights;
 
 %Final diagnostic plots
 Accuracy = counter/TestSize; %Final Accuracy
