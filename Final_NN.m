@@ -26,18 +26,16 @@ FinalWeights=zeros(NumberOfCategories,Layer1Size+1); %FinalWeights(i,j) contains
 
 
 
-%Initialize Layer 1 weights to a Bernoulli r.v. with p=0.5
+%Initialize Layer 1 weights 
 for i=1:Layer1Size
 	for j=1:InputSize
-        rv = randi([-scale,scale]);
-        Layer1Weights(i,j)=rv/scale;
+		Layer1Weights(i,j)=0.5*rand-0.25;       
 	end
 end
-%Initialize Final layer weights as a Bernoulli r.v. with p=0.5
+%Initialize Final layer weights
 for i=1:NumberOfCategories
 	for j=1:Layer1Size+1
-        rv=randi([-scale,scale]);
-        FinalWeights(i,j)=rv/scale;
+        	FinalWeights(i,j)=0.5*rand-0.25;
 	end
 end
 
