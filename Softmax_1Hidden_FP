@@ -51,9 +51,8 @@ sup=0;
 decay=1;
 numchanged=zeros(1,looplength);
 PartialAcc = zeros(1,floor(looplength/5000)); testnum=0; %These variables are used for intermittent accuracy test
+LearningRate=BaseRate;
 for l=1:looplength%Training Loop
-    decay=l/3000+1;
-    LearningRate=BaseRate/decay;
 	Im = horzcat(ImageSet(:,l)',1)';
     LabelVector=zeros(NumberOfCategories,1);
     ind = Labels(l)+1;
