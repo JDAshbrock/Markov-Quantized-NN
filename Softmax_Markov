@@ -27,8 +27,8 @@ FinalWeights=zeros(NumberOfCategories,Layer1Size+1); %FinalWeights(i,j) contains
 
 
 %Initialize Layer 1 weights to a Bernoulli r.v. with p=0.5
-numstates = 2^(bits-1)-1;
-scale = 2*numstates;
+numstates = 2^(bits-1)-1; maxsize=0.5;
+scale = numstates/maxsize;
 for i=1:Layer1Size
 	for j=1:InputSize
         rv = randi([-numstates,numstates]);
@@ -86,11 +86,11 @@ for l=1:looplength%Training Loop
                 delta=-1;
             end 
            FinalWeights(i,j)=FinalWeights(i,j)+delta/scale;
-           if(FinalWeights(i,j)>1)
-               FinalWeights(i,j)=1;
+           if(FinalWeights(i,j)>maxsize)
+               FinalWeights(i,j)=maxsize;
                delta=0;
-           elseif(FinalWeights(i,j)<-1)
-               FinalWeights(i,j)=-1;
+           elseif(FinalWeights(i,j)<-maxsize)
+               FinalWeights(i,j)=-maxsize;
                delta=0;
            end
            numchanged(l)=numchanged(l)+abs(delta);
@@ -111,11 +111,11 @@ for l=1:looplength%Training Loop
                delta=-1;
             end
             Layer1Weights(i,j)=Layer1Weights(i,j)+delta/scale;
-            if(Layer1Weights(i,j)>1)
-                Layer1Weights(i,j)=1;
+            if(Layer1Weights(i,j)>maxsize)
+                Layer1Weights(i,j)=maxsize;
                 delta=0;
-            elseif(Layer1Weights(i,j)<-1)
-                Layer1Weights(i,j)=-1;
+            elseif(Layer1Weights(i,j)<-maxsize)
+                Layer1Weights(i,j)=-maxsize;
                 delta=0;
             end
             numchanged(l)=numchanged(l)+abs(delta);
