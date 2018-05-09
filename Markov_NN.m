@@ -73,8 +73,8 @@ for l=1:looplength%Training Loop
 	% Then it updates the weights as described in the algorithm
 	% We must store these weights because they are used in the gradient computation of layer1
 	for i=1:NumberOfCategories
+		temp = FinalWeights(i,:)*Layer1Outputs;
 		for j=1:(Layer1Size+1) %#ok<ALIGN>
-			temp = FinalWeights(i,:)*Layer1Outputs;
 			FinalGradient(i,j) = 2*alpha*Error(i)*Layer1Outputs(j);
             rv=rand/LearningRate;
             if(j~= Layer1Size+1)
@@ -101,8 +101,8 @@ for l=1:looplength%Training Loop
 	% It first computes the gradient with respect to each of the weights
 	% Then it updates the weights as described in the algorithm
 	for i=1:Layer1Size %#ok<ALIGN>
+		temp = Layer1Weights(i,:)*Im;
 		for j=1:InputSize %#ok<ALIGN>
-			temp = Layer1Weights(i,:)*Im;
 			Layer1Gradient(i,j)= NeuralOutputGradients(i)*(1/(pi+pi*temp*temp))*Im(j);
             rv=rand/LearningRate; 
             delta=0;
