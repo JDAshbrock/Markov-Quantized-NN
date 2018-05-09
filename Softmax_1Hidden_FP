@@ -9,7 +9,6 @@ scale=16;
 InputSize = PictureHeight*PictureWidth+1; % +1 for the bias
 Layer1Size = 20;
 NumberOfCategories = 10; % 1 per digit from 0-9
-alpha = 1; %Scaling parameter so as to interpret gradients as probabilities
 BaseRate=0.1;
 ImageSet = LoadMNISTImages('train-images.idx3-ubyte');
 Labels = LoadMNISTLabels('train-labels.idx1-ubyte');
