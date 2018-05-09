@@ -1,0 +1,153 @@
+clear all
+close all
+clc
+
+PictureHeight=28;
+PictureWidth = 28;
+scale=16;
+
+InputSize = PictureHeight*PictureWidth+1; % +1 for the bias
+Layer1Size = 20;
+NumberOfCategories = 10; % 1 per digit from 0-9
+alpha = 1; %Scaling parameter so as to interpret gradients as probabilities
+BaseRate=1;
+ImageSet = LoadMNISTImages('train-images.idx3-ubyte');
+Labels = LoadMNISTLabels('train-labels.idx1-ubyte');
+TestImages = LoadMNISTImages('t10k-images.idx3-ubyte');
+TestLabels = LoadMNISTLabels('t10k-labels.idx1-ubyte');
+TestSize = 5000;
+looplength=60000; %Control the length of the training loop - 60000 max.
+TotalWeights=InputSize*Layer1Size + (Layer1Size+1)*NumberOfCategories;
+bits = 5;
+Layer1Weights = zeros(Layer1Size,InputSize); %Layer1(i,j) contains the weight from input j into neuron input
+FinalWeights=zeros(NumberOfCategories,Layer1Size+1); %FinalWeights(i,j) contains weight from neuron j into category i
+
+%The following function implements the point-wise arctan needed in the feed-forward step
+
+
+
+%Initialize Layer 1 weights to a Bernoulli r.v. with p=0.5
+numstates = 2^(bits-1)-1;
+scale = 2*numstates;
+for i=1:Layer1Size
+	for j=1:InputSize
+        rv = randi([-numstates,numstates]);
+        Layer1Weights(i,j)=rv/(scale);
+	end
+end
+%Initialize Final layer weights as a Bernoulli r.v. with p=0.5
+for i=1:NumberOfCategories
+	for j=1:Layer1Size+1
+        rv=randi([-numstates,numstates]);
+        FinalWeights(i,j)=rv/(scale);
+	end
+end
+
+Layer1Outputs = zeros(1,Layer1Size); %Layer1Outputs(i) contains the output form neuron i, layer 1
+FinalOutputs = zeros(1,NumberOfCategories); %FinalOutputs(i) contains the output corresponding to category i
+
+decay=1;
+numchanged=zeros(1,looplength);testfreq=1000;
+PartialAcc = zeros(1,floor(looplength/testfreq)); testnum=0; %These variables are used for intermittent accuracy test
+for l=1:looplength%Training Loop
+    %decay=5*floor(l/10000)+1;
+    LearningRate=BaseRate/decay;
+	Im = horzcat(ImageSet(:,l)',1)';
+    LabelVector=zeros(NumberOfCategories,1);
+    ind = Labels(l)+1;
+    LabelVector(Labels(l)+1)=1;
+	%Feed Forward
+	Layer1Outputs = horzcat(pt_atan(Layer1Weights*Im),1)'; %The concatenated one takes care of the bias
+	FinalOutputs = FinalWeights*Layer1Outputs;
+	%Now compute the softmax output
+	temp = exp(FinalOutputs);
+	denom =sum(temp);
+	SoftOut = temp./denom;
+	%Reset the gradient vectors to all zeros
+	FinalGradient = zeros(NumberOfCategories,Layer1Size+1); 
+	Layer1Gradient = zeros(Layer1Size,InputSize);
+	NeuralOutputGradients = zeros(1, Layer1Size);
+	% This loop iterates over all weights in the classification Layer
+	% It first computes the gradient with respect to each of the weights
+	% Then it updates the weights as described in the algorithm
+	% We must store these weights because they are used in the gradient computation of layer1
+	for j=1:(Layer1Size+1)
+        NeuralOutputGradients(j)=-FinalWeights(Labels(l)+1,j); 
+		for i=1:NumberOfCategories %#ok<ALIGN>
+			FinalGradient(i,j) = Layer1Outputs(j)*(FinalOutputs(i)-LabelVector(i));
+            rv=rand/LearningRate;
+            if(j~= Layer1Size+1)
+                NeuralOutputGradients(j)=NeuralOutputGradients(j)+FinalOutputs(i)*FinalWeights(i,j);
+            end
+            delta=0;
+            if(FinalGradient(i,j)<0 && rv<((-1)*FinalGradient(i,j)))
+                delta=1;
+            elseif(FinalGradient(i,j)>0 && rv<FinalGradient(i,j))
+                delta=-1;
+            end 
+           FinalWeights(i,j)=FinalWeights(i,j)+delta/scale;
+           if(FinalWeights(i,j)>1)
+               FinalWeights(i,j)=1;
+               delta=0;
+           elseif(FinalWeights(i,j)<-1)
+               FinalWeights(i,j)=-1;
+               delta=0;
+           end
+           numchanged(l)=numchanged(l)+abs(delta);
+        end
+	end
+	% This loop iterates over all weights in the initial Layer
+	% It first computes the gradient with respect to each of the weights
+	% Then it updates the weights as described in the algorithm
+	for i=1:Layer1Size %#ok<ALIGN>
+        temp = Layer1Weights(i,:)*Im;
+		for j=1:InputSize %#ok<ALIGN>			
+			Layer1Gradient(i,j)= NeuralOutputGradients(i)*(1/(pi+pi*temp*temp))*Im(j);
+            rv=rand/LearningRate; 
+            delta=0;
+            if(Layer1Gradient(i,j) <0 && rv<((-1)*Layer1Gradient(i,j)))
+                delta=1;
+            elseif(Layer1Gradient(i,j)>0 && rv<Layer1Gradient(i,j))
+               delta=-1;
+            end
+            Layer1Weights(i,j)=Layer1Weights(i,j)+delta/scale;
+            if(Layer1Weights(i,j)>1)
+                Layer1Weights(i,j)=1;
+                delta=0;
+            elseif(Layer1Weights(i,j)<-1)
+                Layer1Weights(i,j)=-1;
+                delta=0;
+            end
+            numchanged(l)=numchanged(l)+abs(delta);
+        end
+    end
+    if(rem(l,1000)==1)
+        l
+    end
+    % Test intermittently throughout training
+    if(rem(l,testfreq)==0)
+        counter=0;
+        testnum = testnum+1;
+        for i=1:TestSize
+        Im = horzcat(TestImages(:,i)',1)';
+        TrainingLabel = TestLabels(i);
+     	Layer1Outputs = horzcat(pt_atan(Layer1Weights*Im),1)'; %The concatenated one takes care of the bias
+        FinalOutputs = FinalWeights*Layer1Outputs;
+        %Now compute the softmax output
+        temp = exp(FinalOutputs);
+        denom =sum(temp);
+        SoftOut = temp./denom;
+    	Class = find(FinalOutputs == max(FinalOutputs))-1;% the -1 because index 1 corresponds to 
+    	% classification as a 0
+    	if(Class==TrainingLabel) %#ok<ALIGN>
+        	counter = counter+1;
+        end
+        end
+        acc=counter/TestSize
+        PartialAcc(testnum)=acc;
+    end %End test
+end %End train loop
+    
+    
+%The following code smooths the "parameters updated" by taking a running
+%average of the previous "smoothfactor" parameter updates
