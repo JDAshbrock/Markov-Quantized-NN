@@ -117,8 +117,17 @@ class OutputLayer:
             for j in range(0, self.prevSize):
                 # Weight from neuron j into node i
                 if correctClass == i:
-                    self.Nodes[i].Weights[j]-=LearningRate*prevOutput[j]*(self.Output[i]-1)
+                    self.Nodes[i].Weights[j]-=learningRate*prevOutput[j]*(self.Output[i]-1)
                 else:
-                    self.Nodes[i].Weights[j]-=LearningRate*prevOutput[j]*self.Output[i]
+                    self.Nodes[i].Weights[j]-=learningRate*prevOutput[j]*self.Output[i]
+
+
+class FFNN:
+
+    def __init__(selfself, hiddenlayers, layersize, cats, inputsize):
+        # method creates a list of hidden layer objects with a final output layer included by default
+        self.Layers = [HiddenLayer(layersize,inputsize)]
+
+
 
 
