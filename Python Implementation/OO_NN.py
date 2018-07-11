@@ -12,7 +12,7 @@ import random
 import math
 import numpy as np
 
-learningRate = 0.1
+LearningRate = 0.1
 
 
 class Neuron:
@@ -60,10 +60,13 @@ class HiddenLayer:
     def __init__(self, size, prevSize, LastLayer):
         # LastLayer is a Boolean which is true if this is the last hidden layer
         self.Nodes = []
+        self.OutPartials =[]
         for i in range(0, size):
             self.Nodes.append(Neuron(prevSize))
+            self.OutPartials.append(0)
         self.Size = size
         self.LL=LastLayer
+
 
     def propagate(self, prevOutput):
         self.OutputVec = []
@@ -76,14 +79,19 @@ class HiddenLayer:
             self.Nodes[i].updateWeights(prevOutput, outPartial)
             self.Nodes[i].updateBias(outPartial)
 
-    def computeStatePartials(self, nextPartials, weightsOut, nextOutput):
+    def computeOutPartials(self, nextPartials, weightsOut, nextOutput):
         # Here, nextPartials is a vector of partial derivatives from the next layer,
         # weightsOut is a numpy matrix of weights out of the current layer. Entry [i,j] contains weight out of j, into i
-        # nextOutput is the vector containing the outputs of the next layer neurons
-        for i in range(0, self.Size):
-            #Need weights OUT of neuron i
-            self.weightVec = weightsOut
-            self.Nodes[i].ComputeOutPartial(nextPartials, weightsOut[:,i], nextOutput)
+        # nextOutput is the vector containing the outputs of the next layer neurons\
+        if self.LL:
+            self.
+
+        else:
+            for i in range(0, self.Size):
+                #Need weights OUT of neuron i
+                self.weightVec = weightsOut
+                self.Nodes[i].ComputeOutPartial(nextPartials, weightsOut[:,i], nextOutput)
+
 
 
 class OutputLayer:
@@ -117,16 +125,37 @@ class OutputLayer:
             for j in range(0, self.prevSize):
                 # Weight from neuron j into node i
                 if correctClass == i:
-                    self.Nodes[i].Weights[j]-=learningRate*prevOutput[j]*(self.Output[i]-1)
+                    self.
+                    self.Nodes[i].Weights[j]-=LearningRate*prevOutput[j]*(self.Output[i]-1)
                 else:
-                    self.Nodes[i].Weights[j]-=learningRate*prevOutput[j]*self.Output[i]
+                    self.Nodes[i].Weights[j]-=LearningRate*prevOutput[j]*self.Output[i]
 
 
 class FFNN:
 
-    def __init__(selfself, hiddenlayers, layersize, cats, inputsize):
+    def __init__(self, hiddenlayers, layersize, cats, inputsize):
         # method creates a list of hidden layer objects with a final output layer included by default
         self.Layers = [HiddenLayer(layersize,inputsize)]
+        for i in range(0, hiddenlayers-1):
+            self.Layers.append(HiddenLayer(layersize,layersize))
+        self.OutLayer=OutputLayer(cats,layersize)
+        self.prediction = 0
+        self.hiddenlayers=hiddenlayers
+
+    def predict(self, input):
+        self.Layers[0].propagate(input)
+        for i in range(1,self.hiddenlayers):
+            self.Layers[i].propagate(self.Layers[i-1].OutputVec)
+        self.prediction = self.OutLayer.classify(self.Layers[self.hiddenlayers-1].OutputVec)
+
+    def train(self, input, correctclass):
+        self.predict(input)
+        self.OutLayer.update(self.Layers[self.hiddenlayers-1].OutputVec, correctclass)
+        for i in range(0, self.hiddenlayers):
+            self.Layers[self.hiddenlayers-i-1].update(self.Layers[self.hiddenlayers-i-2].OutputVec,self.Layers[self.hiddenlayers-i-1].OutPartials)
+            self.Layers[self.hiddenlayers-i-1].computeOutPartials(self.Layers[])
+
+
 
 
 
