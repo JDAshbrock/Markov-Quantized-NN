@@ -1,162 +1,230 @@
-# This program is an implementation of the simple neural network in an object-oriented format.
-#The basic objects are neurons. Then the neuron objects are organized into hidden layer objects.
-# Finally, the network contains a list of layers as objects
-# Currently, the following simplifications have been made: Only ReLU nonlinearity, all hidden layers are the same size
-
-
-# CURRENT UPDATE: Finished writing neuron and hidden layer. Neither are really tested
-# Need to include a Boolean value in hidden layer class to say if it is the last hidden layer. This is necessary because
-# There is a different formula for the output partial derivatives
-
+'''Organization:
+    - Partial derivatives and weight updates happen at the neuron layer
+    - The layer class handle passing of information between layers
+    - The NN class handles the training and prediction functions
+    
+    
+    
+    '''
 import random
 import math
-import numpy as np
+import time
+import numpy
+import matplotlib as plt
+#from tensorflow.examples.tutorials.mnist import input_data
+#mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+#The data is mnist.train.images which is (55,000x784) and mnist.train.labels which is (55,0000x10)
 
-LearningRate = 0.1
+random.seed(1)
+LearningRate = 0.005
 
 
-class Neuron:
+class Neuron(object):
     # This class contains the set of weights INTO the neuron and the bias INTO the neuron
     # The nruon has attributes: propagate (the signal), updateWeights, updateBias, and computeOutPartial.
-    def __init__(self, size):
+    def __init__(self, size, NeuronNumber, sd):
         self.Weights = []
         for i in range(0, size):
-            self.Weights.append(random.gauss(0, 0.25))
-        self.Bias = random.gauss(0, 0.25)
+            self.Weights.append(random.gauss(0, 0.1))
+        self.Bias = random.gauss(0, 0.1)
         self.Size = size
+        self.ID = NeuronNumber
+        self.Output=0
+        self.OutPartial=0
 
-    def propagate(self, input):
-        # filter is a boolean value telling us whether or not to filter the result
-        self.Output = 0
-        for i in range(0, len(input)):
-            self.Output += self.Weights[i] * input[i]
-
-        self.UnfilteredOut = self.Output
-        self.Output += self.Bias
-        if self.Output <0:
+    def propagate(self, prevLayer):
+        self.Output = self.Bias
+        for i in range(0, prevLayer.LayerSize):
+            self.Output += self.Weights[i] * prevLayer.Outputs[i]
+        self.UnfilteredOutput=self.Output
+        if self.UnfilteredOutput <0:
             self.Output =0
+        #print("ID: " + str(self.ID) +" Output: " + str(self.Output) +"\n")
 
-    def updateWeights(self, previousLayerOutputs, outPartial):
+    def update_Weights(self, prevLayer):
+        # prevLayer is the previous "Layer" object
         if self.Output > 0:
-            for i in range(0, len(previousLayerOutputs)):
-                self.Weights[i] = self.Weights[i] - LearningRate * outPartial * previousLayerOutputs[i]
+            for i in range(0, prevLayer.LayerSize):
+                self.Weights[i] -= LearningRate * self.OutPartial * prevLayer.Outputs[i]
 
-    def updateBias(self, outPartial):
+    def update_Bias(self):
         if self.Output > 0:
-            self.Bias = self.Bias - outPartial * LearningRate
-
-    def computeOutPartial(self, nextPartials, weightsOut, nextOutput):
-        # This will compute the partial derivative of the error with respect to the output of this neuron
-        # nextPartials is the error partial w.r.t. the next layer outputs
-        # weightsOut are the weights out of this neuron
-        # nextOutput is the Output of the neurons in the next layer
+            self.Bias -=self.OutPartial * LearningRate
+    
+    def compute_Out_Partial(self, nextLayer):
+        # next Layer is the next "Layer" object
         self.OutPartial = 0
-        for i in range(0, len(weightsOut)):
-            if nextOutput[i] > 0:
-                self.OutPartial += nextPartials[i] * weightsOut[i]
+        for i in range(0, nextLayer.LayerSize):
+            if nextLayer.Nodes[i].Output>0:
+                self.OutPartial += nextLayer.OutPartials[i] * nextLayer.Nodes[i].Weights[self.ID]
 
 
-class HiddenLayer:
-    def __init__(self, size, prevSize, LastLayer):
-        # LastLayer is a Boolean which is true if this is the last hidden layer
+class InputLayer(object):
+    def __init__(self, inputVec):
+        self.Outputs=inputVec
+        self.LayerSize=len(inputVec)
+    
+    def new_input(self,next_image):
+        self.Outputs=next_image
+        self.LayerSize=len(next_image)
+        
+    def display(self):
+        self.mat = numpy.mat(self.Outputs)
+        self.mat = self.mat.reshape(28,28)
+        plt.pyplot.figure()
+        imgplot = plt.pyplot.imshow(self.mat)
+        
+    
+    
+class HiddenLayer(object):
+    
+    def __init__(self, size, prevSize):
+    # This layer contains all weights out of the previous layer
+        self.Nodes = []
+        self.OutPartials=[]
+        self.Outputs=[]
+        self.sd=2/math.sqrt(prevSize)
+        for i in range(0, size):
+            self.Nodes.append(Neuron(prevSize, i, self.sd))
+            self.OutPartials.append(0)
+            self.Outputs.append(0)
+        self.LayerSize = size      
+
+    def propagate(self, prevLayer):
+        for i in range(0, self.LayerSize):
+            self.Nodes[i].propagate(prevLayer)
+            self.Outputs[i]=self.Nodes[i].Output
+            
+    def output_Partials(self, nextLayer):
+        for i in range(0, self.LayerSize):
+            self.Nodes[i].compute_Out_Partial(nextLayer)
+            
+    def update(self, prevLayer):
+        for i in range(0, self.LayerSize):
+            self.Nodes[i].update_Weights(prevLayer)
+            self.Nodes[i].update_Bias()
+
+class LastHiddenLayer(HiddenLayer):
+    
+    def output_Partials(self, nextLayer):
+        for i in range(0, self.LayerSize):
+            self.OutPartials[i]=-nextLayer.Nodes[nextLayer.correctClass].Weights[i]
+            for j in range(0, nextLayer.LayerSize):
+                self.OutPartials[i]+=nextLayer.Output[j]*nextLayer.Nodes[j].Weights[i]
+                    
+class OutputLayer(object):
+    
+    def __init__(self, size, prevSize, correctClass=0):
+    # This layer contains all weights out of the previous layer
         self.Nodes = []
         self.OutPartials =[]
+        self.expOut=[]
+        self.Output=[]
+        self.sd=2/math.sqrt(prevSize)
         for i in range(0, size):
-            self.Nodes.append(Neuron(prevSize))
+            self.Nodes.append(Neuron(prevSize, i, self.sd))
             self.OutPartials.append(0)
-        self.Size = size
-        self.LL=LastLayer
-
-
-    def propagate(self, prevOutput):
-        self.OutputVec = []
-        for i in range(0, self.Size):
-            self.Nodes[i].propagate(prevOutput)
-            self.OutputVec.append(self.Nodes[i].Output)
-
-    def update(self, prevOutput, outPartial):
-        for i in range(0, self.Size):
-            self.Nodes[i].updateWeights(prevOutput, outPartial)
-            self.Nodes[i].updateBias(outPartial)
-
-    def computeOutPartials(self, nextPartials, weightsOut, nextOutput):
-        # Here, nextPartials is a vector of partial derivatives from the next layer,
-        # weightsOut is a numpy matrix of weights out of the current layer. Entry [i,j] contains weight out of j, into i
-        # nextOutput is the vector containing the outputs of the next layer neurons\
-        if self.LL:
-            self.
-
-        else:
-            for i in range(0, self.Size):
-                #Need weights OUT of neuron i
-                self.weightVec = weightsOut
-                self.Nodes[i].ComputeOutPartial(nextPartials, weightsOut[:,i], nextOutput)
-
-
-
-class OutputLayer:
-    def __init__(self, numcats, prevSize):
-        self.Nodes = []
-        for i in range(0, numcats):
-            self.Nodes.append(Neuron(prevSize))
-        self.numCats = numcats
-        self.prevSize = prevSize
-
-    def classify(self, input):
+            self.expOut.append(0)
+            self.Output.append(0)
+        self.LayerSize = size
+        self.correctClass=correctClass
+        
+    def propagate(self, prevLayer):
         # Here we use the Unfiltered output which does not contain the bias or the relu non-linearity
-        for i in range(0, self.numCats):
-            self.Nodes[i].propagate(input)
-        self.expOut = []
+        for i in range(0, self.LayerSize):
+            self.Nodes[i].propagate(prevLayer)
         self.total = 0
-        for i in range(0, self.numCats):
-            self.expOut.append(math.exp(self.Nodes[i].UnfilteredOut))
+        for i in range(0, self.LayerSize):
+            try:
+                self.expOut[i]=math.exp(self.Nodes[i].UnfilteredOutput)
+            except: 
+                print("Overflow")
+                time.sleep(10)
             self.total += self.expOut[i]
-        self.Output = []
         self.curmax = 0
-        for i in range(0, self.numCats):
-            self.Output.append(self.expOut[i] / self.total)
+        for i in range(0, self.LayerSize):
+            self.Output[i]=self.expOut[i] / self.total
             if self.Output[i] > self.curmax:
                 self.classification = i
-                curmax = self.Output[i]
+                self.curmax = self.Output[i]
         return self.classification
 
-    def update(self, prevOutput, correctClass):
-        for i in range(0, self.numCats):
-            for j in range(0, self.prevSize):
+    def update(self, prevLayer):
+        for i in range(0, self.LayerSize):
+            for j in range(0, prevLayer.LayerSize):
                 # Weight from neuron j into node i
-                if correctClass == i:
-                    self.
-                    self.Nodes[i].Weights[j]-=LearningRate*prevOutput[j]*(self.Output[i]-1)
+                if self.correctClass == i:
+                    self.Nodes[i].Weights[j]-=LearningRate*prevLayer.Nodes[j].Output*(self.Output[i]-1)
                 else:
-                    self.Nodes[i].Weights[j]-=LearningRate*prevOutput[j]*self.Output[i]
+                    self.Nodes[i].Weights[j]-=LearningRate*prevLayer.Nodes[j].Output*(self.Output[i])
 
 
-class FFNN:
+class FFNN(object):
 
-    def __init__(self, hiddenlayers, layersize, cats, inputsize):
-        # method creates a list of hidden layer objects with a final output layer included by default
-        self.Layers = [HiddenLayer(layersize,inputsize)]
-        for i in range(0, hiddenlayers-1):
-            self.Layers.append(HiddenLayer(layersize,layersize))
-        self.OutLayer=OutputLayer(cats,layersize)
-        self.prediction = 0
-        self.hiddenlayers=hiddenlayers
+    def __init__(self, num_hidden_layers, HL_sizes, num_cats, input_size):
+        if num_hidden_layers >2:
+            self.Hidden_Layers = [HiddenLayer(HL_sizes,input_size)]
+            for i in range(0, num_hidden_layers-2):
+                self.Hidden_Layers.append(HiddenLayer(HL_sizes,HL_sizes))
+            self.Hidden_Layers.append(LastHiddenLayer(HL_sizes,HL_sizes))
+        else:
+            self.Hidden_Layers=[LastHiddenLayer(HL_sizes,input_size)]
+        self.Output_Layer=OutputLayer(num_cats,HL_sizes)
+        self.num_hidden=num_hidden_layers
+        self.input=InputLayer([])
+        self.predicted_class=0
 
-    def predict(self, input):
-        self.Layers[0].propagate(input)
-        for i in range(1,self.hiddenlayers):
-            self.Layers[i].propagate(self.Layers[i-1].OutputVec)
-        self.prediction = self.OutLayer.classify(self.Layers[self.hiddenlayers-1].OutputVec)
+    def predict(self):
+        self.Hidden_Layers[0].propagate(self.input)
+        for i in range(1,self.num_hidden):
+            self.Hidden_Layers[i].propagate(self.Hidden_Layers[i-1])
+        self.predicted_class = self.Output_Layer.propagate(self.Hidden_Layers[-1])
+        
 
-    def train(self, input, correctclass):
-        self.predict(input)
-        self.OutLayer.update(self.Layers[self.hiddenlayers-1].OutputVec, correctclass)
-        for i in range(0, self.hiddenlayers):
-            self.Layers[self.hiddenlayers-i-1].update(self.Layers[self.hiddenlayers-i-2].OutputVec,self.Layers[self.hiddenlayers-i-1].OutPartials)
-            self.Layers[self.hiddenlayers-i-1].computeOutPartials(self.Layers[])
+    def train(self, its):
+        for i in range(0, its):
+            self.predict()     
+            self.Output_Layer.update(self.Hidden_Layers[-1])
+            next_layer = self.Output_Layer
+            for j in range(0, self.num_hidden-1):
+                index = self.num_hidden-j-1
+                self.Hidden_Layers[index].output_Partials(next_layer)
+                self.Hidden_Layers[index].update(self.Hidden_Layers[index-1])
+                next_layer = self.Hidden_Layers[index]
+            self.Hidden_Layers[0].output_Partials(next_layer)
+            self.Hidden_Layers[0].update(self.input)
+            
+
+            
+    
+    def SGD(self, input_list, class_list, iterations):
+        self.count=0
+        for i in range(0, iterations):
+            if i%1000==999:
+                print("Correct: " + str(self.count))
+                self.count=0
+            self.input.new_input(input_list[i,:])
+            #self.input.display()
+            for j in range(0, 10):
+                if class_list[i,j]!=0:
+                    self.Output_Layer.correctClass=j
+            self.input.new_input(input_list[i])
+            self.train(1)
+            if self.predicted_class==self.Output_Layer.correctClass:
+                self.count+=1
+        print("Computed Accuracy: " + str(self.count/iterations))
+    
+
+            
+my_net = FFNN(3,12,10,784)
+my_net.SGD(mnist.train.images,mnist.train.labels,60000)
 
 
+                
+            
+        
+        
+        
+        
 
-
-
-
+        
